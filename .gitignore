@@ -1,0 +1,50 @@
+# dependencies
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.uv-cache/
+.python-version
+dist/
+build/
+*.egg-info/
+
+# vite / web build
+web/dist/
+web/.vite/
+*.local
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+**/.env
+!**/.env.example
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
+# generated/test artifacts
+tmp/
+output/
+*.tmp.pdf
