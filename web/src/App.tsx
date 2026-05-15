@@ -28,6 +28,14 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/"
           element={
             <RequireAuth>
@@ -36,7 +44,6 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="reports/:id/edit" element={<ReportEditorPage />} />
           <Route path="reports/:id/generate" element={<ReportGeneratePage />} />
         </Route>

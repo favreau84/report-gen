@@ -10,7 +10,6 @@
   }
   body {
     @apply bg-bg text-ink font-sans antialiased;
-    font-feature-settings: 'cv11', 'ss01';
   }
   /* Pousse le contenu principal quand le panel d'aperçu PDF est ouvert (desktop) */
   @media (min-width: 1024px) {

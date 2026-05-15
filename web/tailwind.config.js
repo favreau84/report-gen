@@ -4,24 +4,58 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#FAFAFA',
-        ink: '#1F2937',
-        muted: '#6B7280',
-        accent: '#2563EB',
-        accentHover: '#1D4ED8',
-        line: '#E5E7EB',
+        // Palette « papier / encre » éditoriale (design Claude Design).
+        // Les noms hérités (bg, line, muted, accentHover, success) sont conservés
+        // et remappés pour que les écrans existants continuent de résoudre.
+        bg: '#F5F3EE',
+        paper: '#F5F3EE',
         surface: '#FFFFFF',
-        danger: '#DC2626',
-        success: '#16A34A',
+        surfaceAlt: '#FAF8F3',
+        surfaceSunk: '#F1EEE7',
+
+        line: '#E7E2D7',
+        border: '#E7E2D7',
+        borderStrong: '#D8D1C2',
+
+        ink: '#1C1B18',
+        muted: '#615C53',
+        inkMuted: '#615C53',
+        inkSubtle: '#8E8878',
+
+        accent: '#2A4A7F',
+        accentHover: '#1B3360',
+        accentInk: '#1B3360',
+        accentSoft: '#E8EEF8',
+
+        warn: '#B57614',
+        warnSoft: '#F7EFD9',
+        ok: '#5B7B3F',
+        success: '#5B7B3F',
+        okSoft: '#E7EFDD',
+        danger: '#9A3B2E',
       },
       fontFamily: {
         sans: [
-          'Inter Variable',
-          'Inter',
+          'Geist',
+          'ui-sans-serif',
+          'system-ui',
           '-apple-system',
-          'BlinkMacSystemFont',
           'Segoe UI',
           'sans-serif',
+        ],
+        serif: [
+          'Source Serif 4',
+          'Source Serif Pro',
+          'Iowan Old Style',
+          'Georgia',
+          'serif',
+        ],
+        mono: [
+          'Geist Mono',
+          'ui-monospace',
+          'JetBrains Mono',
+          'SF Mono',
+          'monospace',
         ],
       },
       borderRadius: {
