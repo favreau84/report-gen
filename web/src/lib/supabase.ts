@@ -38,7 +38,39 @@ export type Report = {
   updated_at: string;
 };
 
+export type Template = {
+  id: string;
+  owner_id: string;
+  name: string;
+  status: 'draft' | 'ready' | 'generating' | 'done' | 'failed';
+  category: string | null;
+  version_tag: string;
+  tag_convention: TagConvention;
+  tag_prefix: string;
+  docx_path: string | null;
+  docx_filename: string | null;
+  docx_size_bytes: number | null;
+  docx_pages: number | null;
+  docx_sha256: string | null;
+  docx_uploaded_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PlaceholderType = 'field' | 'loop' | 'block' | 'pdf' | 'pdfdir' | 'annex';
+
+export type TemplatePlaceholder = {
+  id: string;
+  template_id: string;
+  key: string;
+  type: PlaceholderType;
+  required: boolean;
+  section: string | null;
+  context: string | null;
+  position: number;
+  detected_by: 'client' | 'worker';
+  created_at: string;
+};
 
 export type ReportPlaceholder = {
   id: string;

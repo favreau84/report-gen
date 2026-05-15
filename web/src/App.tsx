@@ -4,6 +4,7 @@ import { ToastProvider } from './lib/toast';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
+import { TemplateDocumentPage } from './pages/TemplateDocument';
 import { ReportEditorPage } from './pages/ReportEditor';
 import { ReportGeneratePage } from './pages/ReportGenerate';
 
@@ -32,6 +33,14 @@ export default function App() {
           element={
             <RequireAuth>
               <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/templates/:id/document"
+          element={
+            <RequireAuth>
+              <TemplateDocumentPage />
             </RequireAuth>
           }
         />

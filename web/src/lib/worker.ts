@@ -77,3 +77,14 @@ export async function getPreviewPdf(
   });
   return (await r.json()) as PreviewPdfResponse;
 }
+
+export async function getTemplatePreviewPdf(
+  templateId: string,
+  force: boolean = false,
+): Promise<PreviewPdfResponse> {
+  const r = await authed('/template-preview-pdf', {
+    method: 'POST',
+    json: { template_id: templateId, force },
+  });
+  return (await r.json()) as PreviewPdfResponse;
+}

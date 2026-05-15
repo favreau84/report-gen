@@ -1,30 +1,58 @@
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { rg } from '../lib/theme';
 import { AppBar } from '../components/AppBar';
 import { NavRail } from '../components/NavRail';
 import { Icons } from '../components/ui/icons';
 import { Btn, Pill, Progress } from '../components/ui/primitives';
+import { useAuth } from '../lib/auth';
+import { useToast } from '../lib/toast';
+import { supabase, type Template } from '../lib/supabase';
+import { createTemplate, uploadTemplateDocx, isDocx, baseName } from '../lib/templates';
+
+type DashTemplate = Template & { placeholderCount: number };
+
+function ago(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.round(h / 24);
+  if (j < 7) return `il y a ${j} j`;
+  return `il y a ${Math.round(j / 7)} sem.`;
+}
+
+function completionOf(t: Template, ph: number): number {
+  if (!t.docx_path) return 0;
+  if (t.status === 'ready' || t.status === 'done') return 100;
+  return ph > 0 ? 60 : 25;
+}
 
 // ── Carte d'un template récemment édité ──────────────────────────────────────
 function TemplateCard({
   name,
   type,
-  instances,
+  docs,
   lastUsed,
-  blocks,
+  balises,
   completion,
   status,
+  onClick,
 }: {
   name: string;
   type: string;
-  instances: number;
+  docs: number;
   lastUsed: string;
-  blocks: number;
+  balises: number;
   completion: number;
   status?: 'Publié' | 'Brouillon';
+  onClick?: () => void;
 }) {
   return (
     <div
+      onClick={onClick}
       style={{
         background: rg.surface,
         border: `1px solid ${rg.border}`,
@@ -34,6 +62,7 @@ function TemplateCard({
         flexDirection: 'column',
         gap: 12,
         minHeight: 168,
+        cursor: onClick ? 'pointer' : 'default',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -74,12 +103,12 @@ function TemplateCard({
       </div>
       <div style={{ display: 'flex', gap: 12, fontSize: 11.5, color: rg.inkMuted }}>
         <div>
-          <span style={{ color: rg.ink, fontFamily: rg.mono, fontWeight: 500 }}>{blocks}</span>{' '}
-          blocs
+          <span style={{ color: rg.ink, fontFamily: rg.mono, fontWeight: 500 }}>{balises}</span>{' '}
+          balises
         </div>
         <div>
-          <span style={{ color: rg.ink, fontFamily: rg.mono, fontWeight: 500 }}>{instances}</span>{' '}
-          instances
+          <span style={{ color: rg.ink, fontFamily: rg.mono, fontWeight: 500 }}>{docs}</span>{' '}
+          documents
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -194,6 +223,64 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const toast = useToast();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [templates, setTemplates] = useState<DashTemplate[] | null>(null);
+  const [tplError, setTplError] = useState<string | null>(null);
+
+  const loadTemplates = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    if (error) {
+      setTplError(error.message);
+      setTemplates([]);
+      return;
+    }
+    const list = (data ?? []) as Template[];
+    const counts: Record<string, number> = {};
+    if (list.length > 0) {
+      const { data: ph } = await supabase
+        .from('template_placeholders')
+        .select('template_id')
+        .in(
+          'template_id',
+          list.map((t) => t.id),
+        );
+      for (const row of (ph ?? []) as { template_id: string }[]) {
+        counts[row.template_id] = (counts[row.template_id] ?? 0) + 1;
+      }
+    }
+    setTplError(null);
+    setTemplates(list.map((t) => ({ ...t, placeholderCount: counts[t.id] ?? 0 })));
+  }, []);
+
+  useEffect(() => {
+    void loadTemplates();
+  }, [loadTemplates]);
+
+  async function handleImport(file: File | null) {
+    if (!file || !user) return;
+    if (!isDocx(file)) {
+      toast.push('error', 'Seuls les fichiers .docx sont acceptés.');
+      return;
+    }
+    setImporting(true);
+    try {
+      const tpl = await createTemplate(user.id, baseName(file));
+      await uploadTemplateDocx(user.id, tpl.id, file);
+      toast.push('success', 'Template créé.');
+      navigate(`/templates/${tpl.id}/document`);
+    } catch (e) {
+      toast.push('error', (e as Error).message);
+      setImporting(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -208,6 +295,16 @@ export function DashboardPage() {
         overflow: 'hidden',
       }}
     >
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          void handleImport(e.target.files?.[0] ?? null);
+          e.target.value = '';
+        }}
+      />
       <AppBar
         crumbs={['Atelier']}
         right={
@@ -241,8 +338,12 @@ export function DashboardPage() {
                 ⌘K
               </span>
             </div>
-            <Btn variant="ghost" icon={<Icons.upload s={14} />}>
-              Importer DOCX
+            <Btn
+              variant="ghost"
+              icon={<Icons.upload s={14} />}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Import…' : 'Importer DOCX'}
             </Btn>
             <Btn variant="primary" icon={<Icons.plus s={14} />}>
               Nouveau document
@@ -278,7 +379,9 @@ export function DashboardPage() {
                 Templates
               </h1>
               <span style={{ fontSize: 13, color: rg.inkSubtle }}>
-                14 templates · 6 sources de données connectées
+                {templates === null
+                  ? 'Chargement…'
+                  : `${templates.length} template${templates.length > 1 ? 's' : ''}`}
               </span>
             </div>
             <div style={{ fontSize: 13, color: rg.inkMuted }}>
@@ -307,50 +410,71 @@ export function DashboardPage() {
                 Trier : Récents
               </div>
             </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 12,
-              }}
-            >
-              <TemplateCard
-                name="Rapport d'expertise immobilière"
-                type="Évaluation · 12 sections"
-                blocks={28}
-                instances={47}
-                completion={100}
-                status="Publié"
-                lastUsed="il y a 2 h"
-              />
-              <TemplateCard
-                name="Compte-rendu d'intervention"
-                type="Maintenance · 6 sections"
-                blocks={14}
-                instances={128}
-                completion={100}
-                status="Publié"
-                lastUsed="hier"
-              />
-              <TemplateCard
-                name="Audit énergétique DPE"
-                type="Diagnostic · 9 sections"
-                blocks={22}
-                instances={19}
-                completion={78}
-                status="Brouillon"
-                lastUsed="il y a 3 j"
-              />
-              <TemplateCard
-                name="Devis travaux"
-                type="Commercial · 4 sections"
-                blocks={9}
-                instances={64}
-                completion={100}
-                status="Publié"
-                lastUsed="il y a 1 sem."
-              />
-            </div>
+            {tplError && (
+              <div
+                style={{
+                  background: rg.warnSoft,
+                  border: `1px solid ${rg.warn}`,
+                  color: '#7B4F0C',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 12,
+                }}
+              >
+                Impossible de charger les templates : {tplError} (la migration
+                0005_templates.sql est-elle appliquée ?)
+              </div>
+            )}
+            {templates === null && (
+              <div style={{ fontSize: 13, color: rg.inkSubtle, padding: '24px 0' }}>
+                Chargement des templates…
+              </div>
+            )}
+            {templates !== null && !tplError && templates.length === 0 && (
+              <div
+                style={{
+                  border: `1px dashed ${rg.borderStrong}`,
+                  borderRadius: 10,
+                  padding: '28px 20px',
+                  textAlign: 'center',
+                  color: rg.inkSubtle,
+                  fontSize: 13,
+                }}
+              >
+                Aucun template pour l'instant. Clique sur{' '}
+                <strong style={{ color: rg.ink }}>« Importer DOCX »</strong> en haut à droite
+                pour en créer un.
+              </div>
+            )}
+            {templates !== null && templates.length > 0 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: 12,
+                }}
+              >
+                {templates.map((t) => {
+                  const published = t.status === 'ready' || t.status === 'done';
+                  return (
+                    <TemplateCard
+                      key={t.id}
+                      name={t.name}
+                      type={
+                        t.category ??
+                        `${t.docx_filename ?? 'DOCX'} · ${t.version_tag}`
+                      }
+                      balises={t.placeholderCount}
+                      docs={0}
+                      completion={completionOf(t, t.placeholderCount)}
+                      status={published ? 'Publié' : 'Brouillon'}
+                      lastUsed={ago(t.updated_at)}
+                      onClick={() => navigate(`/templates/${t.id}/document`)}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Instances en cours */}

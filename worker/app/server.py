@@ -94,6 +94,11 @@ class PreviewPdfResponse(BaseModel):
     regenerated: bool
 
 
+class TemplatePreviewPdfRequest(BaseModel):
+    template_id: str
+    force: bool = False
+
+
 # =========================
 # Helpers
 # =========================
@@ -109,6 +114,21 @@ def _own_report(report_id: str, user: AuthUser) -> dict[str, Any]:
     )
     if not res.data:
         raise HTTPException(status_code=404, detail="Report not found")
+    return res.data
+
+
+def _own_template(template_id: str, user: AuthUser) -> dict[str, Any]:
+    sb = get_supabase()
+    res = (
+        sb.table("templates")
+        .select("*")
+        .eq("id", template_id)
+        .eq("owner_id", user.id)
+        .single()
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Template not found")
     return res.data
 
 
@@ -215,6 +235,38 @@ def preview_pdf(
     return PreviewPdfResponse(
         path=preview_path, signed_url=signed_url, regenerated=regenerate
     )
+
+
+@app.post("/template-preview-pdf", response_model=PreviewPdfResponse)
+def template_preview_pdf(
+    req: TemplatePreviewPdfRequest, user: AuthUser = Depends(verify_bearer)
+) -> PreviewPdfResponse:
+    """Convertit le DOCX d'un template en PDF (sans rendu des données) pour
+    l'aperçu du workspace. Régénère à chaque appel : le bouton côté UI est un
+    relancement explicite du traitement."""
+    if not soffice_available():
+        raise HTTPException(
+            status_code=503,
+            detail="LibreOffice n'est pas installé sur le worker — impossible de générer l'aperçu PDF.",
+        )
+
+    tpl = _own_template(req.template_id, user)
+    docx_path = tpl.get("docx_path")
+    if not docx_path:
+        raise HTTPException(status_code=400, detail="No docx uploaded for this template")
+
+    preview_path = f"{user.id}/tpl-{req.template_id}.pdf"
+    sb = get_supabase()
+    raw = download("templates", docx_path)
+    pdf_bytes = docx_bytes_to_pdf_bytes(raw)
+    sb.storage.from_("previews").upload(
+        preview_path,
+        pdf_bytes,
+        file_options={"content-type": "application/pdf", "upsert": "true"},
+    )
+    signed = sb.storage.from_("previews").create_signed_url(preview_path, 3600)
+    signed_url = signed.get("signedURL") or signed.get("signed_url") or ""
+    return PreviewPdfResponse(path=preview_path, signed_url=signed_url, regenerated=True)
 
 
 def _preview_is_stale(owner_id: str, report_id: str, docx_path: str) -> bool:
